@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Device views</title>
+  <style>
+    /* Tool page only. Start it with serve.py (next to this file):
+         python3 serve.py <site folder>
+       then open http://127.0.0.1:8787/__device-views/viewer.html?src=/
+       Each device is a real-size frame (so breakpoints and svh units behave as on
+       the device), scaled down with a CSS transform when zoomed out. */
+    :root {
+      --bg: #f6f7f9; --bg2: #e9ecf0; --white: #ffffff;
+      --on: #1b1f24; --on2: #4a525c; --acc: #2457c5;
+      --light: #1b1f24; --ink: #f1f3f5; --ink2: #aab2bc; --ink-acc: #9cc0ff;
+      --space-sm: 8px; --space-md: 12px; --space-2xl: 24px; --space-3xl: 32px;
+      --shadow-raised: 0 12px 32px -16px rgb(0 0 0 / .35);
+      --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; font-family: var(--font-sans); font-size: 15px; line-height: 1.5; color: var(--on); background: var(--bg2); }
+    button, input, select { font: inherit; color: inherit; }
+    :focus-visible { outline: 3px solid var(--acc); outline-offset: 2px; }
+
+    /* Top bar */
+    .bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md) var(--space-2xl); padding: var(--space-md) var(--space-2xl); background: var(--light); color: var(--ink); }
+    .bar__title { font-size: 13px; font-weight: 700; font-stretch: 112%; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+    .addr { display: flex; flex: 1 1 320px; gap: var(--space-sm); min-width: 0; }
+    .addr input { flex: 1; min-width: 0; min-height: 36px; padding: 4px 10px; border: 1px solid var(--ink2); background: transparent; font-family: var(--font-mono); font-size: 13px; color: var(--ink); }
+    .addr input::placeholder { color: var(--ink2); }
+    .bar button, .bar a.ghost { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--ink2); background: none; color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; white-space: nowrap; }
+    .bar button:hover, .bar a.ghost:hover { background: var(--ink); color: var(--on); }
+    .tabs { display: flex; gap: 0; }
+    .tabs button { margin-left: -1px; }
+    .tabs button[aria-pressed="true"] { background: var(--ink-acc); border-color: var(--ink-acc); color: var(--on); }
+    .check { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+    .check input { width: 16px; height: 16px; accent-color: var(--ink-acc); }
+
+    /* Stage */
+    .stage { flex: 1; overflow: auto; padding: var(--space-2xl); }
+    .row { display: flex; flex-wrap: wrap; gap: var(--space-3xl); justify-content: center; align-items: flex-start; }
+    .device { flex: none; display: grid; gap: var(--space-sm); align-content: start; }
+    .device[hidden] { display: none; }
+    .device__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+    .device__name { flex: 1 0 100%; color: var(--acc); font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+    .device__size { color: var(--on2); font-weight: 400; letter-spacing: 0; text-transform: none; }
+    .ctl { min-height: 30px; padding: 0 8px; border: 1px solid var(--on2); background: var(--bg); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .ctl:hover { background: var(--on); color: var(--bg); }
+    select.ctl:hover { background: var(--bg); color: var(--on); }
+    .zoom { display: inline-flex; }
+    .zoom .ctl { margin-left: -1px; min-width: 30px; }
+    .zoom select.ctl { min-width: 72px; }
+    .screen { position: relative; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--on2), var(--shadow-raised); }
+    .screen iframe { position: absolute; top: 0; left: 0; border: 0; background: var(--white); transform-origin: 0 0; }
+    .device--phone .screen { border-radius: 18px; box-shadow: 0 0 0 6px var(--on), var(--shadow-raised); }
+    .device--tablet .screen { border-radius: 12px; box-shadow: 0 0 0 8px var(--on), var(--shadow-raised); }
+    .device--phone, .device--tablet { padding: 8px; }
+    .note { max-width: 70ch; margin: var(--space-2xl) auto 0; color: var(--on2); font-size: 13px; text-align: center; }
+  </style>
+</head>
+<body>
+<header class="bar">
+  <span class="bar__title">Device views</span>
+  <form class="addr" id="addr">
+    <label for="src" class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Page to show</label>
+    <input id="src" list="pages" spellcheck="false" autocomplete="off" placeholder="/">
+    <datalist id="pages"></datalist>
+    <button type="submit">Show</button>
+  </form>
+  <div class="tabs" role="group" aria-label="View">
+    <button type="button" data-view="all" aria-pressed="true">All <span aria-hidden="true">&nbsp;1</span></button>
+    <button type="button" data-view="desktop" aria-pressed="false">Desktop <span aria-hidden="true">&nbsp;2</span></button>
+    <button type="button" data-view="tablet" aria-pressed="false">iPad <span aria-hidden="true">&nbsp;3</span></button>
+    <button type="button" data-view="phone" aria-pressed="false">Mobile <span aria-hidden="true">&nbsp;4</span></button>
+  </div>
+  <label class="check" title="Scrolling one view scrolls the others to the same point of the page"><input type="checkbox" id="sync"> Scroll together</label>
+  <button type="button" id="reload" title="Reload every view (R)">Reload</button>
+</header>
+
+<main class="stage" id="stage">
+  <div class="row" id="row"></div>
+  <p class="note" id="note"></p>
+</main>
+
+<script>
+(function () {
+  var DEVICES = {
+    desktop: { name: 'Desktop', kind: 'desktop', models: [
+      { label: 'Large desktop', w: 1920, h: 1080 },
+      { label: 'Laptop', w: 1440, h: 900 },
+      { label: 'Small laptop', w: 1280, h: 800 }
+    ], model: 1 },
+    tablet: { name: 'iPad', kind: 'tablet', models: [
+      { label: 'iPad mini', w: 768, h: 1024 },
+      { label: 'iPad Air', w: 820, h: 1180 },
+      { label: 'iPad Pro 11"', w: 834, h: 1194 },
+      { label: 'iPad Pro 13"', w: 1024, h: 1366 }
+    ], model: 1 },
+    phone: { name: 'Mobile', kind: 'phone', models: [
+      { label: 'iPhone SE', w: 375, h: 667 },
+      { label: 'iPhone 15', w: 390, h: 844 },
+      { label: 'iPhone 15 Pro Max', w: 430, h: 932 },
+      { label: 'Android (small)', w: 360, h: 800 }
+    ], model: 1 }
+  };
+  var ORDER = ['desktop', 'tablet', 'phone'];
+  var ZOOMS = [0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 1];
+  var GAP = 32;
+
+  /* Saved per viewer: view, model, rotation and zoom per device and per view ('fit' or a number) */
+  var state = {
+    view: 'all', sync: false,
+    model: { desktop: 1, tablet: 1, phone: 1 },
+    landscape: { desktop: false, tablet: false, phone: false },
+    zoom: { all: { desktop: 'fit', tablet: 'fit', phone: 'fit' }, one: { desktop: 'fit', tablet: 'fit', phone: 'fit' } }
+  };
+  try { var saved = JSON.parse(localStorage.getItem('device-views-v3') || 'null'); if (saved) state = Object.assign(state, saved); } catch (e) {}
+  function save() { try { localStorage.setItem('device-views-v3', JSON.stringify(state)); } catch (e) {} }
+
+  var params = new URLSearchParams(location.search);
+  if (params.get('view') && /^(all|desktop|tablet|phone)$/.test(params.get('view'))) state.view = params.get('view');
+  var src = params.get('src') || '/';
+
+  var row = document.getElementById('row');
+  var stage = document.getElementById('stage');
+  var srcInput = document.getElementById('src');
+  var note = document.getElementById('note');
+  var els = {};
+  srcInput.value = src;
+
+  function size(id) {
+    var m = DEVICES[id].models[state.model[id]];
+    return state.landscape[id] ? { w: m.h, h: m.w } : { w: m.w, h: m.h };
+  }
+  function zoomKey() { return state.view === 'all' ? 'all' : 'one'; }
+
+  /* ---------- Build each device ---------- */
+  ORDER.forEach(function (id) {
+    var d = DEVICES[id];
+    var wrap = document.createElement('section');
+    wrap.className = 'device device--' + d.kind;
+    wrap.setAttribute('aria-label', d.name + ' view');
+    wrap.innerHTML =
+      '<div class="device__bar">' +
+        '<span class="device__name">' + d.name + ' <span class="device__size"></span></span>' +
+        '<select class="ctl model" aria-label="' + d.name + ' model">' + d.models.map(function (m, i) {
+          return '<option value="' + i + '">' + m.label + '</option>'; }).join('') + '</select>' +
+        (d.kind !== 'desktop' ? '<button type="button" class="ctl rotate" title="Turn sideways">Rotate</button>' : '') +
+        '<span class="zoom">' +
+          '<button type="button" class="ctl out" aria-label="Zoom out">−</button>' +
+          '<select class="ctl level" aria-label="' + d.name + ' zoom"><option value="fit">Fit</option>' +
+            ZOOMS.map(function (z) { return '<option value="' + z + '">' + Math.round(z * 100) + '%</option>'; }).join('') + '</select>' +
+          '<button type="button" class="ctl in" aria-label="Zoom in">+</button>' +
+        '</span>' +
+        '<a class="ctl open" target="_blank" rel="noopener" title="Open this page in its own tab" style="display:inline-flex;align-items:center;text-decoration:none;color:inherit">↗</a>' +
+      '</div>' +
+      '<div class="screen"><iframe title="' + d.name + '"></iframe></div>';
+    row.appendChild(wrap);
+    var e = els[id] = {
+      wrap: wrap, frame: wrap.querySelector('iframe'), screen: wrap.querySelector('.screen'),
+      sizeLabel: wrap.querySelector('.device__size'), model: wrap.querySelector('.model'),
+      level: wrap.querySelector('.level'), open: wrap.querySelector('.open'), scale: 1
+    };
+    e.model.value = state.model[id];
+    e.model.addEventListener('change', function () { state.model[id] = +e.model.value; save(); layout(); });
+    var rot = wrap.querySelector('.rotate');
+    if (rot) rot.addEventListener('click', function () { state.landscape[id] = !state.landscape[id]; save(); layout(); });
+    e.level.addEventListener('change', function () { setZoom(id, e.level.value === 'fit' ? 'fit' : +e.level.value); });
+    wrap.querySelector('.out').addEventListener('click', function () { step(id, -1); });
+    wrap.querySelector('.in').addEventListener('click', function () { step(id, 1); });
+    e.frame.addEventListener('load', function () { hookScroll(id); });
+  });
+
+  function setZoom(id, z) { state.zoom[zoomKey()][id] = z; save(); layout(); }
+  function step(id, dir) {
+    var cur = els[id].scale, next;
+    if (dir > 0) next = ZOOMS.filter(function (z) { return z > cur + 0.001; })[0] || 1;
+    else next = ZOOMS.filter(function (z) { return z < cur - 0.001; }).pop() || ZOOMS[0];
+    setZoom(id, next);
+  }
+
+  /* ---------- Sizes ---------- */
+  function layout() {
+    var key = zoomKey();
+    var shown = state.view === 'all' ? ORDER : [state.view];
+    ORDER.forEach(function (id) { els[id].wrap.hidden = shown.indexOf(id) < 0; });
+    document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.view === state.view)); });
+
+    var cs = getComputedStyle(stage);
+    var availW = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var barH = 70, frameEdge = 16; /* device controls and the bezel padding */
+    var availH = Math.max(200, stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - frameEdge - 40);
+
+    /* Fixed zooms take their space first. On Fit, the phone fits its own height (never above
+       100%, so it stays readable); desktop and iPad share one scale for the width that's left,
+       so they stay in true proportion to each other. */
+    var phoneFit = Math.min(1, availH / size('phone').h);
+    var zoomOf = function (id) { var z = state.zoom[key][id]; return z === 'fit' && id === 'phone' ? phoneFit : z; };
+    var fixedW = 0, fitW = 0, fitIds = [];
+    shown.forEach(function (id) {
+      var z = zoomOf(id), s = size(id);
+      var edge = DEVICES[id].kind === 'desktop' ? 0 : frameEdge;
+      if (z === 'fit') { fitIds.push(id); fitW += s.w; fixedW += edge; }
+      else fixedW += s.w * z + edge;
+    });
+    var room = availW - fixedW - GAP * (shown.length - 1) - 4;
+    var fit = fitIds.length ? Math.min(1, room / fitW) : 1;
+    fitIds.forEach(function (id) { fit = Math.min(fit, availH / size(id).h); });
+    if (!(fit > 0.12)) fit = 0.12;
+
+    shown.forEach(function (id) {
+      var e = els[id], z = state.zoom[key][id], s = size(id);
+      var scale = z === 'fit' ? (id === 'phone' ? phoneFit : fit) : z;
+      e.scale = scale;
+      e.frame.style.width = s.w + 'px';
+      e.frame.style.height = s.h + 'px';
+      e.frame.style.transform = 'scale(' + scale + ')';
+      e.screen.style.width = Math.round(s.w * scale) + 'px';
+      e.screen.style.height = Math.round(s.h * scale) + 'px';
+      e.sizeLabel.textContent = s.w + '×' + s.h + ' · ' + Math.round(scale * 100) + '%';
+      e.level.value = String(z);
+      /* Keep the controls from widening the device past its screen */
+      e.wrap.style.width = (Math.round(s.w * scale) + (DEVICES[id].kind === 'desktop' ? 0 : 16)) + 'px';
+    });
+  }
+
+  /* ---------- Page ---------- */
+  function load(url) {
+    src = url || '/';
+    srcInput.value = src;
+    var p = new URLSearchParams(location.search); p.set('src', src); p.set('view', state.view);
+    history.replaceState(null, '', '?' + p.toString());
+    ORDER.forEach(function (id) { els[id].frame.src = src; els[id].open.href = src; });
+    var cross = /^https?:/i.test(src) && new URL(src, location.href).origin !== location.origin;
+    note.textContent = cross
+      ? 'This page is on another site, so “Scroll together” is off for it, and some sites refuse to show inside a frame at all.'
+      : 'Each view is the real page at that device’s screen size, so its breakpoints apply exactly. Zooming out only shrinks the picture. Scroll inside a view to move down the page.';
+  }
+
+  /* ---------- Scroll together (same-site pages only) ---------- */
+  var quietUntil = {};
+  function hookScroll(id) {
+    var win;
+    try { win = els[id].frame.contentWindow; win.document; } catch (e) { return; }
+    win.addEventListener('scroll', function () {
+      if (!state.sync || state.view !== 'all') return;
+      if (Date.now() < (quietUntil[id] || 0)) return;
+      var de = win.document.documentElement;
+      var max = de.scrollHeight - win.innerHeight;
+      var f = max > 0 ? win.scrollY / max : 0;
+      ORDER.forEach(function (other) {
+        if (other === id) return;
+        try {
+          var w2 = els[other].frame.contentWindow, d2 = w2.document.documentElement;
+          quietUntil[other] = Date.now() + 120;
+          w2.scrollTo(0, f * (d2.scrollHeight - w2.innerHeight));
+        } catch (e) {}
+      });
+    }, { passive: true });
+  }
+
+  /* ---------- Page list for the address box ---------- */
+  function listPages() {
+    var dl = document.getElementById('pages');
+    var add = function (v) { var o = document.createElement('option'); o.value = v; dl.appendChild(o); };
+    /* Every HTML page in the site folder, listed by serve.py */
+    fetch('/__device-views/pages.json').then(function (r) { return r.ok ? r.json() : []; }).then(function (pages) {
+      if (!pages.length) add('/');
+      pages.forEach(add);
+    }).catch(function () { add('/'); });
+  }
+
+  /* ---------- Controls ---------- */
+  function setView(v) {
+    state.view = v; save(); layout();
+    var p = new URLSearchParams(location.search); p.set('view', v);
+    history.replaceState(null, '', '?' + p.toString());
+  }
+  document.querySelectorAll('.tabs button').forEach(function (b) { b.addEventListener('click', function () { setView(b.dataset.view); }); });
+  document.getElementById('addr').addEventListener('submit', function (e) { e.preventDefault(); load(srcInput.value.trim()); });
+  var sync = document.getElementById('sync');
+  sync.checked = state.sync;
+  sync.addEventListener('change', function () { state.sync = sync.checked; save(); });
+  function reload() { ORDER.forEach(function (id) { try { els[id].frame.contentWindow.location.reload(); } catch (e) { els[id].frame.src = els[id].frame.src; } }); }
+  document.getElementById('reload').addEventListener('click', reload);
+  addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    var v = { '1': 'all', '2': 'desktop', '3': 'tablet', '4': 'phone' }[e.key];
+    if (v) setView(v);
+    if (e.key === 'r' || e.key === 'R') reload();
+  });
+  addEventListener('resize', layout);
+
+  layout();
+  load(src);
+  listPages();
+})();
+</script>
+</body>
+</html>

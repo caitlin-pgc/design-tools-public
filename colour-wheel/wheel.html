@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colour Wheel</title>
+<style>
+  :root {
+    --bg: #000;
+    --panel: #111;
+    --line: #2a2a2a;
+    --text: #f2f2f2;
+    --muted: #9a9a9a;
+    --num: #e0383e;
+    --accent: #fff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 360px; max-width: 100vw; min-height: 100vh; }
+  .stage { display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .wheel-wrap { position: relative; width: min(92vh, 100%); aspect-ratio: 1; }
+  .wheel-wrap canvas, .wheel-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 14px; max-height: 100vh; overflow: auto; }
+  h1 { font-size: 18px; margin: 0; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+  textarea { width: 100%; min-height: 76px; resize: vertical; background: #000; color: var(--text);
+    border: 1px solid #3a3a3a; border-radius: 6px; padding: 8px; font: 14px ui-monospace, Menlo, monospace; }
+  textarea:focus, button:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button { background: #222; color: var(--text); border: 1px solid #3a3a3a; border-radius: 6px;
+    padding: 7px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+  button:hover { background: #2e2e2e; }
+  button.primary { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+  input[type=color] { width: 40px; height: 34px; padding: 0; border: 1px solid #3a3a3a; border-radius: 6px; background: none; cursor: pointer; }
+  label.tog { display: flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+  .msg { font-size: 13px; color: #f0a35e; min-height: 1em; margin: 0; }
+  ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  li { display: grid; grid-template-columns: 22px 34px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  li { cursor: pointer; }
+  li.hot { border-color: #fff; }
+  li.sel { border-color: #fff; box-shadow: inset 0 0 0 1px #fff; }
+  .hint.sub { margin-top: -6px; }
+  .credit { color: var(--muted); font-size: 12px; margin: auto 0 0; }
+  .credit a { color: var(--text); }
+  .credit a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .idx { font-weight: 700; font-size: 13px; color: var(--muted); text-align: center; }
+  .sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; }
+  .hex { font: 600 14px ui-monospace, Menlo, monospace; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .x { background: none; border: none; color: var(--muted); font-size: 18px; padding: 2px 8px; }
+  .x:hover { color: #fff; background: none; }
+  .comp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--muted); }
+  .comp b { font: 600 13px ui-monospace, Menlo, monospace; color: var(--text); }
+  .csw { width: 16px; height: 16px; border-radius: 50%; border: 1.5px dashed #fff; }
+  .mini { padding: 2px 8px; font-size: 12px; }
+  .pair { display: inline-grid; place-items: center; min-width: 30px; height: 22px; padding: 0 6px; border-radius: 4px; font: 700 13px system-ui, sans-serif; }
+  .ratio { margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .target { display: grid; gap: 2px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .target output { color: var(--text); font-weight: 600; }
+  .target input { width: 100%; min-height: 24px; margin: 0; accent-color: #fff; cursor: pointer; }
+  .tip { position: fixed; pointer-events: none; background: #fff; color: #000; font-size: 13px;
+    padding: 6px 9px; border-radius: 6px; display: none; z-index: 5; box-shadow: 0 4px 14px #0008; }
+  .marker { cursor: pointer; }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    aside, .stage { min-width: 0; }
+    aside { border-left: none; border-top: 1px solid var(--line); max-height: none; }
+    .wheel-wrap { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="stage">
+    <div class="wheel-wrap" id="wrap">
+      <canvas id="wheel" aria-hidden="true"></canvas>
+      <svg id="marks" viewBox="0 0 1000 1000" role="img" aria-label="Your colours on the colour wheel"></svg>
+    </div>
+  </main>
+  <aside>
+    <h1>Colour wheel</h1>
+    <p class="hint">Paste hex codes (any separator, with or without #). Each colour is placed by its hue (segment 1–36) and by how light or dark it is: lighter than the pure colour sits in the pale outer band, darker sits nearer the centre. Duller colours are marked “muted”.</p>
+    <textarea id="input" placeholder="Paste hex codes here" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="primary" id="add">Add colours</button>
+      <input type="color" id="picker" value="#e76f51" aria-label="Pick a colour to add">
+      <button id="clear">Clear all</button>
+    </div>
+    <p class="msg" id="msg" role="status"></p>
+    <div class="row">
+      <label class="tog"><input type="checkbox" id="spokes" checked> Lines to centre</label>
+      <label class="tog"><input type="checkbox" id="comp"> Show complements</label>
+      <label class="tog"><input type="checkbox" id="ana"> Show analogous</label>
+    </div>
+    <p class="hint sub" id="anaHint" hidden>Click a colour on the wheel or in the list to see its analogous colours.</p>
+    <ol id="list"></ol>
+    <div class="row">
+      <button id="copy">Copy link</button>
+      <button id="png">Download image</button>
+    </div>
+    <p class="credit">The wheel is based on Don Jusko's <a href="http://www.realcolorwheel.com/colorwheel.htm" target="_blank" rel="noopener">Real Color Wheel</a>, from <a href="https://www.flickr.com/photos/unleashingmephotography/2316833560" target="_blank" rel="noopener">a photo by Michael Hernandez</a> (<a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener">CC BY 2.0</a>).</p>
+  </aside>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+// ---------- geometry (all radii as a fraction of the wheel radius) ----------
+const SEGMENTS = 36;
+const R_OUT = 1.0;      // outer edge of the tint band
+const R_FULL = 0.88;    // full-strength ring starts here (tint band is outside it)
+const R_HUB = 0.25;     // shade rings stop here
+const SHADE_RINGS = 11; // ring 0 = full colour … ring 10 = nearly black
+const MAX_TINT = 0.72;  // outer edge of the tint band = 72% white
+const MAX_SHADE = 0.92; // innermost ring = 92% black
+
+// Wheel angle (clockwise from top, degrees) <-> HSL hue. Yellow at the top, red, magenta,
+// blue, cyan and green clockwise, 60° apart: angle = 60 - hue.
+const angleFromHue = h => ((60 - h) % 360 + 360) % 360;
+const hueFromAngle = a => ((60 - a) % 360 + 360) % 360;
+const segmentOf = a => (Math.round(a / 10) % SEGMENTS) + 1;
+
+// ---------- colour maths ----------
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function hexToRgb(hex) {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+}
+const toHex = rgb => '#' + rgb.map(v => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('').toUpperCase();
+function rgbToHsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  const l = (max + min) / 2;
+  const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  return [h, s, l, d];
+}
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+function rgbToLab(rgb) {
+  const lin = rgb.map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  const x = (lin[0] * 0.4124 + lin[1] * 0.3576 + lin[2] * 0.1805) / 0.95047;
+  const y = (lin[0] * 0.2126 + lin[1] * 0.7152 + lin[2] * 0.0722);
+  const z = (lin[0] * 0.0193 + lin[1] * 0.1192 + lin[2] * 0.9505) / 1.08883;
+  const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+const deltaE = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+// WCAG contrast between two colours, from 1:1 (the same) to 21:1 (black on white)
+function luminance(rgb) {
+  const lin = rgb.map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+}
+function contrast(a, b) {
+  const x = luminance(a), y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+// Each colour has its own contrast target for its complement. 1:1 keeps the complement at the
+// same lightness (opposite hues at the same lightness clash but barely contrast). Higher targets
+// move its lightness, as little as they can, until the pair reaches that contrast.
+const DEFAULT_TARGET = 3;
+const TARGETS = [
+  { at: 1, label: 'same lightness' },
+  { at: 3, label: 'large text and icons (AA)' },
+  { at: 4.5, label: 'body text (AA)' },
+  { at: 7, label: 'body text (AAA)' },
+];
+const targetLabel = t => { let s = ''; TARGETS.forEach(x => { if (t >= x.at) s = x.label; }); return s; };
+function complement(rgb, h, s, l, target) {
+  const hue = (h + 180) % 360;
+  let best = null, most = null;
+  for (let i = 0; i <= 400; i++) {
+    const li = i / 400, c = hslToRgb(hue, s, li), r = contrast(rgb, c), d = Math.abs(li - l);
+    if (r >= target - 1e-9 && (!best || d < best.d)) best = { d, rgb: c, ratio: r };
+    if (!most || r > most.ratio) most = { rgb: c, ratio: r };
+  }
+  // A target too high for this colour (7:1 next to a mid-tone, say) falls back to the most it can get
+  const pick = best || most;
+  return { hex: toHex(pick.rgb), ratio: pick.ratio, reached: !!best };
+}
+
+// Colour of the wheel at a given angle and "depth" u: u < 0 tint (toward white), u > 0 shade (toward black).
+function wheelColour(angle, u) {
+  const pure = hslToRgb(hueFromAngle(angle), 1, 0.5);
+  return u < 0 ? mix(pure, [255, 255, 255], -u * MAX_TINT) : mix(pure, [0, 0, 0], u * MAX_SHADE);
+}
+const radiusFromU = u => u < 0 ? R_FULL + (-u) * (R_OUT - R_FULL) * 0.9 : R_FULL - u * (R_FULL - R_HUB) * 0.97;
+
+// Place a colour: exact hue for the angle, closest tint/shade (in Lab) for the radius.
+function place(hex, target = DEFAULT_TARGET) {
+  const rgb = hexToRgb(hex);
+  const [h, s, l, chroma] = rgbToHsl(rgb);
+  if (chroma < 0.04) {
+    return { hex, rgb, grey: true, l, desc: l > 0.96 ? 'White' : l < 0.04 ? 'Black' : `Grey (${Math.round(l * 100)}% light)`, note: 'no hue, shown in the centre' };
+  }
+  const angle = angleFromHue(h);
+  const lab = rgbToLab(rgb);
+  // match on lightness: the ring is how light or dark the colour is next to its pure hue
+  let best = { d: Infinity, u: 0, lab: null };
+  for (let i = -100; i <= 100; i++) {
+    const u = i / 100, w = rgbToLab(wheelColour(angle, u)), d = Math.abs(lab[0] - w[0]);
+    if (d < best.d) best = { d, u, lab: w };
+  }
+  const seg = segmentOf(angle);
+  const comp = segmentOf((angle + 180) % 360);
+  let desc;
+  if (best.u < -0.08) desc = `Tint, ${Math.round(-best.u * MAX_TINT * 100)}% white`;
+  else if (best.u <= 0.05) desc = 'Full colour ring';
+  else desc = `Shade ring ${Math.min(SHADE_RINGS - 1, Math.round(best.u * (SHADE_RINGS - 1)))} of ${SHADE_RINGS - 1}`;
+  // how much duller than the wheel colour at the same lightness
+  const ratio = Math.hypot(lab[1], lab[2]) / Math.max(1, Math.hypot(best.lab[1], best.lab[2]));
+  const muted = ratio < 0.35 ? 'very muted (greyed)' : ratio < 0.7 ? 'muted' : '';
+  // complement: hue turned 180°, same saturation, lightness moved to reach this colour's target
+  const c = complement(rgb, h, s, l, target);
+  return { hex, rgb, angle, u: best.u, seg, comp, compHex: c.hex, compRatio: c.ratio, compReached: c.reached, target, desc, muted, d: best.d };
+}
+
+// ---------- drawing the wheel ----------
+const canvas = document.getElementById('wheel');
+const svg = document.getElementById('marks');
+const wrap = document.getElementById('wrap');
+const SCALE = 0.40; // wheel radius as a fraction of the square (rest is room for numbers)
+
+function drawWheel() {
+  const dpr = window.devicePixelRatio || 1;
+  const size = Math.round(wrap.clientWidth * dpr);
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const c = size / 2, R = size * SCALE;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, size, size);
+  const rad = a => (a - 90) * Math.PI / 180; // wheel angle -> canvas angle
+  const seg = 360 / SEGMENTS;
+
+  for (let k = 0; k < SEGMENTS; k++) {
+    const mid = k * seg, a0 = rad(mid - seg / 2), a1 = rad(mid + seg / 2);
+    // tint band: pale outside to full colour inside
+    const grad = ctx.createRadialGradient(c, c, R * R_FULL, c, c, R * R_OUT);
+    grad.addColorStop(0, toHex(wheelColour(mid, -0.35)));
+    grad.addColorStop(1, toHex(wheelColour(mid, -1)));
+    ctx.beginPath(); ctx.arc(c, c, R * R_OUT, a0, a1); ctx.arc(c, c, R * R_FULL, a1, a0, true); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+    // shade rings: full colour at the outside to nearly black at the hub
+    const step = (R_FULL - R_HUB) / SHADE_RINGS;
+    for (let r = 0; r < SHADE_RINGS; r++) {
+      const ro = R * (R_FULL - r * step), ri = R * (R_FULL - (r + 1) * step);
+      ctx.beginPath(); ctx.arc(c, c, ro, a0, a1); ctx.arc(c, c, ri, a1, a0, true); ctx.closePath();
+      ctx.fillStyle = toHex(wheelColour(mid, r / (SHADE_RINGS - 1)));
+      ctx.fill();
+    }
+  }
+  // thin dark ring lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = Math.max(1, size / 900);
+  for (let r = 1; r < SHADE_RINGS; r++) {
+    ctx.beginPath(); ctx.arc(c, c, R * (R_FULL - r * (R_FULL - R_HUB) / SHADE_RINGS), 0, Math.PI * 2); ctx.stroke();
+  }
+  // white segment lines (inside the tint band only, like the reference)
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = Math.max(1, size / 700);
+  for (let k = 0; k < SEGMENTS; k++) {
+    const a = rad(k * seg + seg / 2);
+    ctx.beginPath();
+    ctx.moveTo(c + Math.cos(a) * R * R_HUB, c + Math.sin(a) * R * R_HUB);
+    ctx.lineTo(c + Math.cos(a) * R * R_OUT, c + Math.sin(a) * R * R_OUT);
+    ctx.stroke();
+  }
+  // hub: black disc with a ring of complementary colours (each cell shows the colour opposite it)
+  ctx.beginPath(); ctx.arc(c, c, R * R_HUB, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill();
+  for (let k = 0; k < SEGMENTS; k++) {
+    const mid = k * seg, a0 = rad(mid - seg / 2), a1 = rad(mid + seg / 2);
+    ctx.beginPath(); ctx.arc(c, c, R * 0.235, a0, a1); ctx.arc(c, c, R * 0.185, a1, a0, true); ctx.closePath();
+    ctx.fillStyle = toHex(wheelColour((mid + 180) % 360, 0)); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, size / 1400); ctx.stroke();
+  }
+  // segment numbers: every sixth in white, the rest in red
+  ctx.font = `600 ${Math.round(size * 0.024)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let k = 0; k < SEGMENTS; k++) {
+    const a = rad(k * seg), rr = R * 1.075;
+    ctx.fillStyle = k % 6 === 0 ? '#fff' : '#e0383e';
+    ctx.fillText(String(k + 1), c + Math.cos(a) * rr, c + Math.sin(a) * rr);
+  }
+}
+
+// ---------- markers ----------
+let colours = [];
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const opts = { spokes: true, comp: false, ana: false };
+let selected = -1; // the colour whose analogous colours are shown
+
+// Analogous colours: the hue turned 30° (3 segments) each way, same saturation and lightness
+const ANA_STEP = 30;
+function analogous(p) {
+  const [h, s, l] = rgbToHsl(p.rgb);
+  // wheel angle runs opposite to HSL hue, so +angle is -hue
+  return [-1, 1].map(dir => {
+    const hex = toHex(hslToRgb(((h - dir * ANA_STEP) % 360 + 360) % 360, s, l));
+    return { hex, seg: place(hex).seg };
+  });
+}
+
+function point(p, i, greys) {
+  const C = 500, R = 1000 * SCALE;
+  if (p.grey) {
+    // spread greys across the black centre, dark to light
+    const n = greys.length, j = greys.indexOf(i);
+    const x = C + (n > 1 ? (j / (n - 1) - 0.5) * R * 0.26 : 0);
+    return [x, C];
+  }
+  const a = (p.angle - 90) * Math.PI / 180, r = R * radiusFromU(p.u);
+  return [C + Math.cos(a) * r, C + Math.sin(a) * r];
+}
+
+let placed = [];
+function render() {
+  if (selected >= colours.length) selected = -1;
+  placed = colours.map(c => place(c.hex, c.target));
+  document.getElementById('anaHint').hidden = !(opts.ana && selected < 0 && colours.length);
+  renderMarks();
+  renderList();
+}
+
+function renderMarks() {
+  svg.innerHTML = '';
+  const greys = placed.map((p, i) => p.grey ? i : -1).filter(i => i >= 0).sort((a, b) => placed[a].l - placed[b].l);
+  const pts = placed.map((p, i) => point(p, i, greys));
+  const hued = placed.map((p, i) => i).filter(i => !placed[i].grey);
+
+  if (opts.spokes) hued.forEach(i => svg.append(el('line', { x1: 500, y1: 500, x2: pts[i][0], y2: pts[i][1], stroke: '#fff', 'stroke-width': 2, 'stroke-dasharray': '6 5', opacity: 0.8 })));
+  const sel = placed[selected];
+  if (opts.ana && sel && !sel.grey) analogous(sel).forEach((a, k) => {
+    const q = place(a.hex), ang = (q.angle - 90) * Math.PI / 180, r = 1000 * SCALE * radiusFromU(q.u);
+    const x = 500 + Math.cos(ang) * r, y = 500 + Math.sin(ang) * r;
+    svg.append(el('line', { x1: pts[selected][0], y1: pts[selected][1], x2: x, y2: y, stroke: '#fff', 'stroke-width': 2, opacity: 0.7 }));
+    const dot = el('circle', { cx: x, cy: y, r: 13, fill: a.hex, stroke: '#fff', 'stroke-width': 2.5, 'stroke-dasharray': '1.5 3', 'stroke-linecap': 'round' });
+    const title = el('title', {}); title.textContent = `Analogous to ${selected + 1}: ${a.hex}, segment ${a.seg}`; dot.append(title);
+    svg.append(dot);
+    const n = el('text', { x, y: y + 1, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': 12, 'font-weight': 700,
+      fill: rgbToLab(hexToRgb(a.hex))[0] > 60 ? '#000' : '#fff', 'font-family': 'system-ui, sans-serif', 'pointer-events': 'none' });
+    n.textContent = (selected + 1) + (k ? 'b' : 'a'); svg.append(n);
+  });
+  if (opts.comp) hued.forEach(i => {
+    const p = placed[i], q = place(p.compHex, 1);
+    // A high target can push the complement to near-black or near-white, which has no hue of its
+    // own: keep it on the opposite spoke, at the darkest or palest end
+    const angle = q.grey ? (p.angle + 180) % 360 : q.angle, u = q.grey ? (q.l < 0.5 ? 1 : -1) : q.u;
+    const a = (angle - 90) * Math.PI / 180, r = 1000 * SCALE * radiusFromU(u);
+    const x = 500 + Math.cos(a) * r, y = 500 + Math.sin(a) * r;
+    svg.append(el('line', { x1: pts[i][0], y1: pts[i][1], x2: x, y2: y, stroke: p.hex, 'stroke-width': 2, opacity: 0.7 }));
+    const ring = el('circle', { cx: x, cy: y, r: 13, fill: p.compHex, stroke: '#fff', 'stroke-width': 2.5, 'stroke-dasharray': '4 3' });
+    const title = el('title', {}); title.textContent = `Complement of ${i + 1}: ${p.compHex}, ${fmt(p.compRatio)} contrast`; ring.append(title);
+    svg.append(ring);
+    const n = el('text', { x, y: y + 1, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': 13, 'font-weight': 700,
+      fill: rgbToLab(hexToRgb(p.compHex))[0] > 60 ? '#000' : '#fff', 'font-family': 'system-ui, sans-serif', 'pointer-events': 'none' });
+    n.textContent = i + 1; svg.append(n);
+  });
+
+  placed.forEach((p, i) => {
+    const [x, y] = pts[i];
+    const g = el('g', { class: 'marker', 'data-i': i, tabindex: 0 });
+    g.append(el('circle', { cx: x, cy: y, r: 22, fill: '#000', opacity: 0.55 }));
+    if (i === selected) g.append(el('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: '#fff', 'stroke-width': 3 }));
+    g.append(el('circle', { cx: x, cy: y, r: 18, fill: p.hex, stroke: '#fff', 'stroke-width': 4 }));
+    g.setAttribute('role', 'button');
+    g.setAttribute('aria-pressed', String(i === selected));
+    g.setAttribute('aria-label', `Colour ${i + 1}, ${p.hex}. Select to show its analogous colours`);
+    const t = el('text', { x, y: y + 1, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': 17, 'font-weight': 700,
+      fill: rgbToLab(p.rgb)[0] > 60 ? '#000' : '#fff', 'font-family': 'system-ui, sans-serif' });
+    t.textContent = i + 1; g.append(t);
+    g.addEventListener('mouseenter', e => hover(i, e, p));
+    g.addEventListener('mousemove', e => moveTip(e));
+    g.addEventListener('mouseleave', () => hover(-1));
+    g.addEventListener('focus', () => highlight(i));
+    g.addEventListener('blur', () => highlight(-1));
+    g.addEventListener('click', () => select(i));
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i); } });
+    svg.append(g);
+  });
+}
+
+const fmt = r => (Math.floor(r * 10) / 10).toFixed(1) + ':1';
+function compText(p) {
+  return p.compReached
+    ? `${fmt(p.compRatio)} against ${p.hex}`
+    : `${fmt(p.compRatio)}, the most this colour can get (target ${fmt(p.target)})`;
+}
+
+function renderList() {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  placed.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.dataset.i = i;
+    if (i === selected) li.classList.add('sel');
+    const ana = opts.ana && i === selected && !p.grey ? analogous(p) : null;
+    const where = p.grey ? `${p.desc}, ${p.note}` : `Segment ${p.seg} · ${p.desc}${p.muted ? ' · ' + p.muted : ''} · complement ${p.comp}`;
+    li.innerHTML = `<span class="idx">${i + 1}</span><span class="sw" style="background:${p.hex}"></span>
+      <span><div class="hex">${p.hex}</div><div class="meta">${where}</div>${opts.comp && !p.grey ? `
+        <div class="comp"><span class="csw" style="background:${p.compHex}"></span>Complement <b data-k="hex">${p.compHex}</b>
+        <span class="pair" data-k="pair" style="background:${p.hex};color:${p.compHex}" aria-hidden="true">Aa</span>
+        <button class="mini" data-act="copy">Copy</button><button class="mini" data-act="add">Add</button></div>
+        <div class="ratio" data-k="ratio">${compText(p)}</div>
+        <label class="target"><span>Contrast <output data-k="out">${fmt(p.target)}</output> · <span data-k="label">${targetLabel(p.target)}</span></span>
+          <input type="range" min="1" max="7" step="0.5" value="${p.target}" aria-label="Contrast target for the complement of ${p.hex}"></label>` : ''}${ana ? ana.map((a, k) => `
+        <div class="comp"><span class="csw" style="background:${a.hex};border-style:dotted"></span>Analogous ${i + 1}${k ? 'b' : 'a'} <b>${a.hex}</b> · segment ${a.seg}
+        <button class="mini" data-act="copy" data-hex="${a.hex}">Copy</button><button class="mini" data-act="add" data-hex="${a.hex}">Add</button></div>`).join('') : ''}${opts.ana && i === selected && p.grey ? '<div class="ratio">Greys have no hue, so no analogous colours.</div>' : ''}</span>
+      <button class="x" aria-label="Remove ${p.hex}">×</button>`;
+    li.querySelector('.x').onclick = () => { colours.splice(i, 1); selected = selected === i ? -1 : selected > i ? selected - 1 : selected; update(); };
+    li.addEventListener('click', e => { if (!e.target.closest('button, input, label')) select(i); });
+    li.querySelectorAll('.mini').forEach(b => b.onclick = async () => {
+      const hex = b.dataset.hex || placed[i].compHex;
+      if (b.dataset.act === 'add') { add(hex); return; }
+      try { await navigator.clipboard.writeText(hex); msg.textContent = `Copied ${hex}`; }
+      catch (e) { msg.textContent = `Could not copy. The code is ${hex}`; }
+    });
+    const range = li.querySelector('input[type=range]');
+    if (range) {
+      // While dragging, only this colour's complement and the markers redraw, so the slider keeps focus
+      range.addEventListener('input', () => {
+        colours[i].target = +range.value;
+        const q = placed[i] = place(colours[i].hex, colours[i].target);
+        const k = n => li.querySelector(`[data-k="${n}"]`);
+        k('hex').textContent = q.compHex;
+        k('pair').style.color = q.compHex;
+        li.querySelector('.csw').style.background = q.compHex;
+        k('ratio').textContent = compText(q);
+        k('out').textContent = fmt(q.target);
+        k('label').textContent = targetLabel(q.target);
+        range.setAttribute('aria-valuetext', `${fmt(q.target)}, ${targetLabel(q.target)}. Complement ${q.compHex}, ${compText(q)}`);
+        renderMarks();
+      });
+      range.addEventListener('change', save);
+    }
+    li.onmouseenter = () => highlight(i);
+    li.onmouseleave = () => highlight(-1);
+    list.append(li);
+  });
+}
+
+const tip = document.getElementById('tip');
+function hover(i, e, p) {
+  highlight(i);
+  if (i < 0) { tip.style.display = 'none'; return; }
+  tip.textContent = p.grey ? `${i + 1}. ${p.hex}: ${p.desc}` : `${i + 1}. ${p.hex}: segment ${p.seg}, ${p.desc.toLowerCase()}`;
+  tip.style.display = 'block'; moveTip(e);
+}
+function moveTip(e) { tip.style.left = e.clientX + 14 + 'px'; tip.style.top = e.clientY + 14 + 'px'; }
+function highlight(i) {
+  document.querySelectorAll('#list li').forEach(li => li.classList.toggle('hot', +li.dataset.i === i));
+  svg.querySelectorAll('.marker').forEach(g => {
+    g.style.opacity = i < 0 || +g.dataset.i === i ? 1 : 0.35;
+    if (+g.dataset.i === i) svg.append(g); // bring to front
+  });
+}
+
+function select(i) {
+  selected = selected === i ? -1 : i;
+  // selecting a colour is how you ask for its analogous colours, so turn them on
+  if (selected >= 0 && !opts.ana) document.getElementById('ana').checked = opts.ana = true;
+  render();
+}
+
+// ---------- input, state, sharing ----------
+const msg = document.getElementById('msg');
+function parse(text) {
+  const found = [], bad = [];
+  text.split(/[\s,;]+/).filter(Boolean).forEach(tok => {
+    const m = tok.replace(/^#/, '').match(/^([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    m ? found.push(toHex(hexToRgb(m[1]))) : bad.push(tok);
+  });
+  return { found, bad };
+}
+function add(text) {
+  const { found, bad } = parse(text);
+  colours.push(...found.map(hex => ({ hex, target: DEFAULT_TARGET })));
+  msg.textContent = bad.length ? `Not a hex code, skipped: ${bad.join(', ')}` : '';
+  update();
+}
+// In the link, a colour with its own target carries it after a dash: #c=1F6F5C,F2C14E-4.5
+const clampTarget = t => Number.isFinite(t) ? clamp(Math.round(t * 2) / 2, 1, 7) : DEFAULT_TARGET;
+function save() {
+  const code = c => c.hex.slice(1) + (c.target !== DEFAULT_TARGET ? '-' + c.target : '');
+  history.replaceState(null, '', colours.length ? '#c=' + colours.map(code).join(',') : location.pathname);
+  try { localStorage.setItem('colour-wheel', JSON.stringify(colours)); } catch (e) {}
+}
+function update() { save(); render(); }
+function fromStored(list) {
+  // Older saves are plain hex strings, without a target
+  return (Array.isArray(list) ? list : []).map(c => typeof c === 'string' ? { hex: c } : c)
+    .filter(c => c && /^#[0-9A-F]{6}$/i.test(c.hex))
+    .map(c => ({ hex: c.hex.toUpperCase(), target: clampTarget(c.target) }));
+}
+
+document.getElementById('add').onclick = () => { const ta = document.getElementById('input'); add(ta.value); ta.value = ''; };
+document.getElementById('input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.getElementById('add').click(); }
+});
+document.getElementById('picker').addEventListener('change', e => add(e.target.value));
+document.getElementById('clear').onclick = () => { colours = []; selected = -1; msg.textContent = ''; update(); };
+for (const k of ['spokes', 'comp', 'ana']) {
+  const box = document.getElementById(k);
+  box.onchange = () => {
+    opts[k] = box.checked;
+    if (k === 'ana' && box.checked && selected < 0 && colours.length) selected = 0;
+    render();
+  };
+  opts[k] = box.checked;
+}
+document.getElementById('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(location.href); msg.textContent = 'Link copied. It opens with these colours.'; }
+  catch (e) { msg.textContent = 'Could not copy. Copy the address bar instead.'; }
+};
+document.getElementById('png').onclick = () => {
+  // flatten the canvas and the markers into one image
+  const img = new Image();
+  const data = new XMLSerializer().serializeToString(svg);
+  img.onload = () => {
+    const out = document.createElement('canvas');
+    out.width = out.height = canvas.width;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    ctx.drawImage(img, 0, 0, out.width, out.height);
+    const a = document.createElement('a');
+    a.download = 'colour-wheel.png'; a.href = out.toDataURL('image/png'); a.click();
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(data.includes('xmlns=') ? data : data.replace('<svg', `<svg xmlns="${NS}"`));
+};
+
+// start: link first, then this browser's last list
+const fromHash = location.hash.match(/c=([0-9a-f,.\-]+)/i);
+if (fromHash) {
+  colours = fromHash[1].split(',').map(tok => {
+    const [code, t] = tok.split('-'), hex = parse(code).found[0];
+    return hex && { hex, target: t === undefined ? DEFAULT_TARGET : clampTarget(parseFloat(t)) };
+  }).filter(Boolean);
+} else { try { colours = fromStored(JSON.parse(localStorage.getItem('colour-wheel') || '[]')); } catch (e) { colours = []; } }
+
+new ResizeObserver(drawWheel).observe(wrap);
+drawWheel();
+render();
+</script>
+</body>
+</html>

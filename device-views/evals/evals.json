@@ -1,0 +1,32 @@
+[
+  {
+    "skills": ["device-views"],
+    "query": "Show me how my site in ./site looks on mobile, iPad and desktop",
+    "files": ["site/index.html"],
+    "expected_behavior": [
+      "Starts serve.py in the background with the site folder and uses the address it prints",
+      "Opens viewer.html?src=/ (or /index.html) in the browser",
+      "Takes a headless screenshot and checks all three frames show the page before handing over",
+      "Explains the tabs, zoom, model and scroll-together controls briefly"
+    ]
+  },
+  {
+    "skills": ["device-views"],
+    "query": "My Vite app is running on localhost:5173, can I see it at phone size?",
+    "files": [],
+    "expected_behavior": [
+      "Starts serve.py pointed at any folder just to host the viewer",
+      "Passes the full dev server address as src, with &view=phone",
+      "Mentions Scroll together won't work for a dev server on another address"
+    ]
+  },
+  {
+    "skills": ["device-views"],
+    "query": "Preview https://example.com on iPad",
+    "files": [],
+    "expected_behavior": [
+      "Opens the viewer with the full address as src and &view=tablet",
+      "If the frame is blank, explains the site refuses to be framed and suggests opening it directly"
+    ]
+  }
+]

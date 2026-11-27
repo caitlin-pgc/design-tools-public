@@ -1,0 +1,33 @@
+{
+  "name": "design-tools-public",
+  "description": "Design and accessibility tools for Claude Code: a WCAG 2.2 AA accessibility checker, a colour wheel for hex palettes, and desktop, iPad and mobile device views.",
+  "owner": {
+    "name": "Caitlin Hamilton",
+    "url": "https://github.com/caitlin-pgc"
+  },
+  "plugins": [
+    {
+      "name": "design-tools",
+      "description": "Accessibility audits (WCAG 2.2 AA), a colour wheel for hex palettes, and side-by-side device views of a website.",
+      "version": "1.2.0",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./accessibility-checker",
+        "./colour-wheel",
+        "./device-views"
+      ],
+      "keywords": [
+        "accessibility",
+        "wcag",
+        "a11y",
+        "colour",
+        "color",
+        "responsive",
+        "design"
+      ],
+      "license": "MIT",
+      "repository": "https://github.com/caitlin-pgc/design-tools-public"
+    }
+  ]
+}

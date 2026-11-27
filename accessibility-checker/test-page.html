@@ -1,0 +1,90 @@
+<!doctype html>
+<!-- Deliberately inaccessible test page for the accessibility checker.
+     Every problem here is on purpose. The "Correct" section must produce no findings. -->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Accessibility checker test page</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 0; background: #fff; color: #222; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+  header nav a { margin-right: 12px; color: #0b57d0; }
+  .faint { color: #aaa; }
+  .on-dark { background: #333; color: #555; padding: 8px; }
+  .hero { position: relative; height: 160px; background: linear-gradient(90deg, #fde68a, #f97316); color: #fff; display: flex; align-items: center; padding: 0 16px; }
+  .no-ring:focus { outline: none; }
+  .fake-btn { display: inline-block; padding: 8px 12px; background: #0b57d0; color: #fff; cursor: pointer; border-radius: 4px; }
+  .ticker { overflow: hidden; white-space: nowrap; border: 1px solid #ccc; }
+  .ticker span { display: inline-block; animation: slide 12s linear infinite; }
+  @keyframes slide { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+  .pale-field { border: 1px solid #eee; padding: 6px; }
+  p a.plain { color: #333; text-decoration: none; }
+  .tiny { display: inline-block; width: 16px; height: 16px; padding: 0; border: 0; background: #ddd; margin-right: 2px; }
+  .carousel { display: flex; gap: 8px; overflow: hidden; }
+  .carousel div { flex: 0 0 200px; height: 60px; background: #e5e7eb; }
+  .ok { color: #1f2937; }
+  .ok-btn { padding: 8px 14px; background: #1d4ed8; color: #fff; border: 0; border-radius: 4px; }
+  .ok-btn:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+  .ok-field { border: 1px solid #6b7280; padding: 6px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<header>
+  <nav>
+    <a href="/">Home</a><a href="/a">About</a><a href="/b">Work</a><a href="/c">Blog</a><a href="/d">Contact</a><a href="/e">Shop</a>
+  </nav>
+</header>
+<div class="wrap">
+  <h2>Broken things</h2>
+
+  <p class="faint">This paragraph is light grey on white (2.32:1).</p>
+  <p class="on-dark">Dark grey text on a darker grey box.</p>
+  <div class="hero"><span>White text on a yellow-to-orange gradient</span></div>
+
+  <h4>Skipped heading level</h4>
+  <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="80" height="40">
+  <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="80" height="40" alt="photo.jpg">
+
+  <p><span class="fake-btn" onclick="alert('hi')">Click-only button</span>
+     <button class="no-ring">No focus ring</button>
+     <button><svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 2h12v12H2z"/></svg></button>
+     <a href="#x" tabindex="3">Positive tabindex</a></p>
+
+  <p>Read our policy. <a href="/policy">Click here</a>. Or see the <a class="plain" href="/terms">terms of service</a> in this sentence, which only differ by colour.</p>
+
+  <form>
+    <input type="text" placeholder="Your name" class="pale-field">
+    <input type="email" id="em"><label for="em">Email</label>
+    <input type="radio" name="size" id="s1"><label for="s1">Small</label>
+    <input type="radio" name="size" id="s2"><label for="s2">Large</label>
+    <div role="checkbox" tabindex="0">Custom checkbox with no state</div>
+    <div role="buton" tabindex="0">Misspelt role</div>
+  </form>
+
+  <p><button class="tiny" aria-label="One"></button><button class="tiny" aria-label="Two"></button><button class="tiny" aria-label="Three"></button></p>
+
+  <div class="ticker"><span>Breaking news scrolls forever with no pause button</span></div>
+  <div class="carousel" id="carousel"><div></div><div></div><div></div><div></div><div></div></div>
+
+  <div aria-hidden="true"><a href="/hidden">Focusable but hidden from screen readers</a></div>
+  <iframe srcdoc="<p>frame</p>" width="200" height="40"></iframe>
+  <p aria-labelledby="nope">Points at a missing id</p>
+
+  <h2>Correct things (should not be flagged)</h2>
+  <main>
+    <p class="ok">Dark grey text on white passes.</p>
+    <button class="ok-btn">Good button</button>
+    <label for="ok1">Good field</label> <input id="ok1" class="ok-field" autocomplete="name">
+    <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="" width="40" height="20">
+    <button class="ok-btn"><svg aria-hidden="true" width="16" height="16"></svg><span class="sr-only">Close</span></button>
+  </main>
+</div>
+<script>
+  // JS-driven carousel: invisible to getAnimations, found by the motion snapshot.
+  const c = document.getElementById('carousel');
+  setInterval(() => { c.appendChild(c.firstElementChild); }, 1500);
+</script>
+</body>
+</html>

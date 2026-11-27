@@ -1,0 +1,9 @@
+# Local testing only
+.impeccable/
+playground/
+
+.DS_Store
+__pycache__/
+
+# Accessibility audits produced by trying the checker
+accessibility-audit/

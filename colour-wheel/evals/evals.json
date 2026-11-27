@@ -1,0 +1,32 @@
+[
+  {
+    "skills": ["colour-wheel"],
+    "query": "Show my brand colours on a colour wheel: #1F6F5C, #F2C14E, #E76F51",
+    "files": [],
+    "expected_behavior": [
+      "Opens wheel.html with the colours in the link: #c=1F6F5C,F2C14E,E76F51",
+      "Uses the platform's open command (open on Mac, start on Windows)",
+      "Explains in plain words how to add colours, read the list and use complements"
+    ]
+  },
+  {
+    "skills": ["colour-wheel"],
+    "query": "Are these colours complementary? 2A9D8F E76F51",
+    "files": [],
+    "expected_behavior": [
+      "Opens the wheel with both colours placed",
+      "Reads the segment numbers and says whether they are about 18 segments apart (complementary)",
+      "Answers in plain words, not only segment numbers"
+    ]
+  },
+  {
+    "skills": ["colour-wheel"],
+    "query": "I need a complement for #F2C14E that's dark enough for body text on it",
+    "files": [],
+    "expected_behavior": [
+      "Opens the wheel with F2C14E-4.5 in the link so its contrast target is 4.5:1",
+      "Tells them to switch on Show complements and read the complement's hex code and achieved contrast from the list",
+      "Mentions 4.5:1 is the AA level for body text, and 7:1 for AAA"
+    ]
+  }
+]

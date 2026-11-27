@@ -1,0 +1,40 @@
+[
+  {
+    "skills": ["accessibility-checker"],
+    "query": "Check accessibility-checker/test-page.html for WCAG AA problems.",
+    "files": ["accessibility-checker/test-page.html"],
+    "expected_behavior": [
+      "Serves the file over a local http server and opens it in Chrome rather than only reading the HTML source",
+      "Runs audit.js in the page and confirms leads with screenshots before reporting them",
+      "Reports the planted failures: low-contrast text, missing alt, unlabelled field, placeholder-only label, click-only span, outline removed, positive tabindex, aria-hidden focusable link, invalid role, missing lang, zoom blocked, endless ticker and timed carousel with no pause",
+      "Reports nothing from the 'Correct things' section",
+      "Writes accessibility-audit/findings.json in the format from findings-format.md, builds it with build_report.py, and opens accessibility-report.html",
+      "Puts colour, wording and motion choices into decisions with a recommended option, and code-only changes (div to button, role typo, tabindex, zoom) into fixes with no decision",
+      "Doesn't change the audited page's code during the audit"
+    ]
+  },
+  {
+    "skills": ["accessibility-checker"],
+    "query": "Is the homepage of my site keyboard accessible? It's running at http://localhost:5173/",
+    "files": [],
+    "expected_behavior": [
+      "Uses the running dev server address instead of starting a new server",
+      "Walks the page with real Tab key presses, calling __a11yFocusInfo() and taking a screenshot at each stop",
+      "Checks focus visibility, order, obscured focus, traps, skip link, and Enter/Space/Escape/arrow-key behaviour on menus and dialogs",
+      "Tries every not-keyboard-reachable and pointer-not-focusable lead by hand",
+      "Says how many Tab stops were covered if it didn't walk all of them"
+    ]
+  },
+  {
+    "skills": ["accessibility-checker"],
+    "query": "Our marketing site has a hero carousel and a news ticker. Do they pass WCAG?",
+    "files": [],
+    "expected_behavior": [
+      "Asks for or finds the site address before testing",
+      "Runs __a11yMotionSnapshot(), waits about 6 seconds without interacting, then runs __a11yMotionCompare()",
+      "Applies the 2.2.2 test: starts automatically, lasts more than 5 seconds, alongside other content, and no keyboard-operable named pause/stop/hide control",
+      "Uses any pause control with the keyboard and confirms the motion actually stops",
+      "Treats prefers-reduced-motion support as a recommendation, not a substitute for a pause control"
+    ]
+  }
+]
